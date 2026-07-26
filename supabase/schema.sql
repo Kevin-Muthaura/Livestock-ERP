@@ -395,4 +395,126 @@ insert into diagnosis_catalogue (name, name_sw, category) values
   ('Other (describe below)', 'Nyingine (eleza chini)', 'other')
 on conflict do nothing;
 
+-- ---------------------------------------------------------------------
+-- BREEDING & CALVING REMINDERS (Phase 2, Module A) — in-app only for now
+-- ---------------------------------------------------------------------
+
+create or replace view upcoming_breeding_events
+with (security_invoker = true) as
+select * from (
+  select
+    br.id as breeding_record_id,
+    br.farm_id,
+    br.animal_id,
+    a.tag_id,
+    a.name as animal_name,
+    case
+      when br.expected_calving_date is not null
+           and br.actual_calving_date is null
+           and br.expected_calving_date <= current_date + interval '14 days'
+        then 'calving_due'
+      when br.service_date is not null
+           and br.pregnancy_confirmed is null
+           and br.service_date <= current_date - interval '45 days'
+        then 'pregnancy_check_due'
+      when br.heat_date is not null
+           and br.service_date is null
+           and br.heat_date <= current_date - interval '18 days'
+        then 'next_heat_expected'
+      else null
+    end as event_type,
+    br.heat_date,
+    br.service_date,
+    br.pregnancy_confirmed,
+    br.expected_calving_date
+  from breeding_records br
+  join animals a on a.id = br.animal_id
+  where a.status not in ('sold', 'dead')
+) events
+where event_type is not null;
+
+grant select on upcoming_breeding_events to authenticated;
+
+create index if not exists idx_breeding_animal_open
+  on breeding_records(animal_id, created_at desc)
+  where actual_calving_date is null;
+
+-- ---------------------------------------------------------------------
+-- CUSTOMER / DEBTOR LEDGER (Phase 2, Module C)
+-- ---------------------------------------------------------------------
+
+create table milk_deliveries (
+  id uuid primary key default uuid_generate_v4(),
+  farm_id uuid references farms(id) on delete cascade,
+  customer_id uuid references customers(id) on delete cascade,
+  date date not null default current_date,
+  quantity_litres numeric(10,2) not null,
+  unit_price numeric(12,2) not null,
+  amount numeric(12,2) generated always as (quantity_litres * unit_price) stored,
+  notes text,
+  revenue_id uuid references revenues(id),
+  created_at timestamptz default now()
+);
+
+create table customer_payments (
+  id uuid primary key default uuid_generate_v4(),
+  farm_id uuid references farms(id) on delete cascade,
+  customer_id uuid references customers(id) on delete cascade,
+  date date not null default current_date,
+  amount numeric(12,2) not null,
+  method text check (method in ('cash','mpesa','bank','other')) default 'cash',
+  notes text,
+  created_at timestamptz default now()
+);
+
+create or replace function post_delivery_to_revenue()
+returns trigger as $$
+declare
+  new_revenue_id uuid;
+begin
+  insert into revenues (farm_id, type, amount, date, customer_id, quantity, unit_price)
+  values (new.farm_id, 'milk_sale', new.amount, new.date, new.customer_id, new.quantity_litres, new.unit_price)
+  returning id into new_revenue_id;
+
+  update milk_deliveries set revenue_id = new_revenue_id where id = new.id;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger trg_post_delivery_to_revenue
+after insert on milk_deliveries
+for each row execute function post_delivery_to_revenue();
+
+create or replace view customer_balances
+with (security_invoker = true) as
+select
+  c.id as customer_id,
+  c.farm_id,
+  c.name,
+  c.phone,
+  c.type,
+  coalesce(d.total_delivered, 0) as total_delivered,
+  coalesce(p.total_paid, 0) as total_paid,
+  coalesce(d.total_delivered, 0) - coalesce(p.total_paid, 0) as balance
+from customers c
+left join (
+  select customer_id, sum(amount) as total_delivered from milk_deliveries group by customer_id
+) d on d.customer_id = c.id
+left join (
+  select customer_id, sum(amount) as total_paid from customer_payments group by customer_id
+) p on p.customer_id = c.id;
+
+grant select on customer_balances to authenticated;
+
+alter table milk_deliveries enable row level security;
+create policy farm_isolation_milk_deliveries on milk_deliveries for all
+  using (is_farm_member(farm_id)) with check (is_farm_member(farm_id));
+
+alter table customer_payments enable row level security;
+create policy farm_isolation_customer_payments on customer_payments for all
+  using (is_farm_member(farm_id)) with check (is_farm_member(farm_id));
+
+create index idx_deliveries_farm_customer_date on milk_deliveries(farm_id, customer_id, date);
+create index idx_payments_farm_customer_date on customer_payments(farm_id, customer_id, date);
+
 -- End of schema

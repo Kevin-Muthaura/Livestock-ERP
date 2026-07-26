@@ -1,28 +1,46 @@
-# Livestock ERP — Phase 1 MVP
+# Livestock ERP — Phase 1 + Phase 2 MVP
 
 Offline-first dairy farm management PWA. Built with Next.js, Supabase, and Dexie (IndexedDB).
 
-See `SETUP_GUIDE.docx` (provided alongside this project) for full, non-technical, step-by-step
-instructions to get this running — creating your free Supabase project, running the database
-schema, deploying to Vercel, and installing it on a phone.
+See `SETUP_GUIDE.docx` for full, non-technical, step-by-step instructions to deploy this
+(Supabase project, schema, Twilio SMS login, Vercel hosting, installing on a phone).
 
-## What's implemented (Phase 1, per the architecture doc's roadmap)
+## Database setup
 
+Run, in order, in the Supabase SQL Editor:
+1. `supabase/schema.sql` — full schema (Phase 1 + Phase 2, all in one file for fresh installs)
+
+If you already deployed Phase 1 previously and are only now adding Phase 2, instead run just:
+2. `supabase/migrations/002_breeding_reminders.sql`
+3. `supabase/migrations/003_customer_ledger.sql`
+
+## What's implemented
+
+### Phase 1
 - Phone + OTP sign-in, once, then offline PIN unlock on that device
-- Farm onboarding wizard
-- Animal registration (birth / purchase / transfer-in)
-- Offline-capable daily milk entry (stepper UI, morning/evening shifts)
-- Health logging from a Swahili/English diagnosis picklist
-- Feed logging with automatic cost posting
+- Farm onboarding wizard, animal registration
+- Offline milk entry, health logging (Swahili/English picklist), feed logging
 - Manual cost/revenue entry with a live profit dashboard
-- Team/role management (Admin, Manager, Worker, Vet, Accountant)
-- Installable PWA (works on any Android phone via Chrome, no app store)
-- Full offline write queue with tiered sync priority (financial/health -> milk -> reference data)
+- Team/role management, installable PWA, tiered offline sync queue
 
-## What's next (Phase 2/3, per Section I of the architecture doc)
+### Phase 2 (this update)
+- **Breeding & Calving Calendar** — offline heat/service/pregnancy-check logging from
+  Worker → Breeding; Manager → Breeding dashboard shows in-app reminders (next heat window,
+  overdue pregnancy check, calving due within 14 days). When the calf is registered from
+  Worker → Animal → Birth, the app auto-suggests the dam from confirmed pregnancies and, on
+  save, closes her breeding record and flips her status to lactating — no separate step needed.
+  Manager → Breeding also has a manual "record calving" fallback for stillbirths or phoned-in
+  reports where no calf is being tagged.
+- **Per-Animal Profitability** — Manager → Profitability ranks every animal by profit over the
+  last 30/90 days (feed + vet costs are exact per-animal; milk revenue is fairly allocated by
+  litres produced, since milk is usually sold in bulk).
+- **Customer/Debtor Ledger** — Manager → Customers tracks milk buyers, deliveries, payments,
+  running balances, and a per-customer statement. Deliveries auto-post to the revenue table via
+  a database trigger, so the finance dashboard and profitability numbers stay in sync automatically.
 
-Breeding & calving calendar, per-animal profitability engine, customer/debtor invoicing,
-animal-group milking, SMS fallback alerts, M-Pesa integration, data export for SACCO loans.
+## What's still postponed (per current scope)
+
+SMS alerts, M-Pesa integration, multi-farm support, advanced analytics.
 
 ## Local development
 
@@ -35,11 +53,10 @@ npm run dev
 ## Project structure
 
 ```
-app/                  Next.js App Router pages (worker screens, manager dashboard)
-components/           Shared UI (BigButton, PendingBadge, SyncInit)
-lib/                   auth.js, db.js (Dexie), sync.js (offline queue), refreshCache.js
-supabase/schema.sql    Full Postgres schema + Row Level Security -- run this in Supabase
-supabase/functions/    Edge Function(s) for server-side logic (profitability, Phase 2+)
-public/manifest.json   PWA manifest (installable home-screen app)
-public/sw.js           Service worker
+app/manager/breeding/            Breeding & calving reminders dashboard
+app/manager/profitability/       Per-animal profit ranking
+app/manager/customers/           Debtor ledger (list + per-customer statement)
+app/worker/breeding/             Offline heat / service / pregnancy-check entry
+supabase/schema.sql              Full schema (run this for a fresh install)
+supabase/migrations/             Incremental migrations (for upgrading an existing install)
 ```

@@ -28,7 +28,7 @@ export default function ManagerDashboard() {
       since.setDate(since.getDate() - 30);
       const sinceStr = since.toISOString().slice(0, 10);
 
-      const [{ data: costs }, { data: revenues }, { data: animals }, { data: invoices }, { data: feedInv }] =
+      const [{ data: costs }, { data: revenues }, { data: animals }, { data: invoices }, { data: feedInv }, { data: breedingEvents }] =
         await Promise.all([
           supabase.from("costs").select("amount").eq("farm_id", ctx.farm_id).gte("date", sinceStr),
           supabase.from("revenues").select("amount").eq("farm_id", ctx.farm_id).gte("date", sinceStr),
@@ -39,6 +39,7 @@ export default function ManagerDashboard() {
             .eq("farm_id", ctx.farm_id)
             .neq("status", "paid"),
           supabase.from("feed_inventory").select("quantity, reorder_level, feed_types(name)").eq("farm_id", ctx.farm_id),
+          supabase.from("upcoming_breeding_events").select("breeding_record_id").eq("farm_id", ctx.farm_id),
         ]);
 
       const totalCost = (costs || []).reduce((s, c) => s + Number(c.amount), 0);
@@ -57,6 +58,7 @@ export default function ManagerDashboard() {
         outstanding,
         totalAnimals: (animals || []).length,
         statusCounts,
+        breedingReminders: (breedingEvents || []).length,
       });
 
       setLowStock((feedInv || []).filter((f) => Number(f.quantity) <= Number(f.reorder_level)));
@@ -142,13 +144,27 @@ export default function ManagerDashboard() {
         <Link href="/manager/animals" className="bg-green-700 text-white rounded-xl p-4 text-center font-semibold">
           🐄 Animals
         </Link>
+        <Link href="/manager/breeding" className="bg-purple-700 text-white rounded-xl p-4 text-center font-semibold relative">
+          🐣 Breeding
+          {stats?.breedingReminders > 0 && (
+            <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
+              {stats.breedingReminders}
+            </span>
+          )}
+        </Link>
         <Link href="/manager/finance" className="bg-blue-700 text-white rounded-xl p-4 text-center font-semibold">
           💵 Finance
         </Link>
-        <Link href="/manager/team" className="bg-purple-700 text-white rounded-xl p-4 text-center font-semibold">
+        <Link href="/manager/profitability" className="bg-teal-700 text-white rounded-xl p-4 text-center font-semibold">
+          📊 Profitability
+        </Link>
+        <Link href="/manager/customers" className="bg-indigo-700 text-white rounded-xl p-4 text-center font-semibold">
+          🧾 Customers
+        </Link>
+        <Link href="/manager/team" className="bg-neutral-700 text-white rounded-xl p-4 text-center font-semibold">
           👥 Team
         </Link>
-        <Link href="/worker" className="bg-neutral-700 text-white rounded-xl p-4 text-center font-semibold">
+        <Link href="/worker" className="bg-neutral-500 text-white rounded-xl p-4 text-center font-semibold col-span-2">
           📱 Worker view
         </Link>
       </div>

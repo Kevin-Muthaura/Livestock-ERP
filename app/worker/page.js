@@ -40,6 +40,7 @@ export default function WorkerHome() {
         <BigButton href="/worker/feed" icon="🌾" label="Feed" sublabel="Log feeding" color="bg-amber-700" />
         <BigButton href="/worker/health" icon="🩺" label="Health" sublabel="Log treatment" color="bg-rose-700" />
         <BigButton href="/worker/animal/new" icon="🐄" label="Animal" sublabel="Register new" color="bg-green-700" />
+        <BigButton href="/worker/breeding" icon="🐣" label="Breeding" sublabel="Heat, service, pregnancy" color="bg-purple-700" />
       </div>
 
       <PendingBadge />

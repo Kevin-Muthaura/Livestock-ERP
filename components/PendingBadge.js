@@ -5,12 +5,11 @@ import { pendingCount, flushPendingWrites } from "@/lib/sync";
 
 export default function PendingBadge() {
   const [count, setCount] = useState(0);
-  const [online, setOnline] = useState(true);
+  const [online, setOnline] = useState(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
 
   useEffect(() => {
     const update = () => pendingCount().then(setCount);
     update();
-    setOnline(navigator.onLine);
 
     const interval = setInterval(update, 4000);
     const goOnline = () => setOnline(true);
