@@ -312,6 +312,45 @@ returns boolean as $$
   );
 $$ language sql security definer stable;
 
+-- Used for admin/manager-only actions (adding team members, editing farm settings).
+-- IMPORTANT: any check against farm_users must go through a SECURITY DEFINER
+-- function like this one rather than an inline subquery written directly
+-- inside a policy defined ON farm_users itself — Postgres cannot resolve a
+-- policy on a table that queries that same table from within its own policy
+-- body, and fails with "infinite recursion detected in policy for relation".
+-- A SECURITY DEFINER function runs as its owner (the table owner), which
+-- bypasses RLS for its internal query, breaking that cycle.
+create or replace function is_farm_admin_or_manager(target_farm_id uuid)
+returns boolean as $$
+  select exists (
+    select 1 from farm_users
+    where farm_id = target_farm_id
+      and user_id = auth.uid()
+      and status = 'active'
+      and role in ('admin', 'manager')
+  );
+$$ language sql security definer stable;
+
+create or replace function is_farm_admin(target_farm_id uuid)
+returns boolean as $$
+  select exists (
+    select 1 from farm_users
+    where farm_id = target_farm_id
+      and user_id = auth.uid()
+      and status = 'active'
+      and role = 'admin'
+  );
+$$ language sql security definer stable;
+
+-- Lets the very first farm_users row for a brand-new farm be created (by
+-- whoever just created the farm, as its admin) even though, at that moment,
+-- they don't have an existing membership row yet to satisfy the normal
+-- "already an admin of this farm" check.
+create or replace function farm_has_no_members(target_farm_id uuid)
+returns boolean as $$
+  select not exists (select 1 from farm_users where farm_id = target_farm_id);
+$$ language sql security definer stable;
+
 do $$
 declare
   t text;
@@ -340,30 +379,40 @@ create policy lifecycle_events_isolation on lifecycle_events for all using (
   exists (select 1 from animals a where a.id = lifecycle_events.animal_id and is_farm_member(a.farm_id))
 );
 
--- farms: visible if you are any member (any status) of that farm
+-- farms: visible if you are any active member of that farm
 alter table farms enable row level security;
 create policy farm_visible_to_members on farms for select using (
-  exists (select 1 from farm_users where farm_id = farms.id and user_id = auth.uid())
+  is_farm_member(id)
 );
 create policy farm_update_by_admin on farms for update using (
-  exists (select 1 from farm_users where farm_id = farms.id and user_id = auth.uid() and role = 'admin' and status = 'active')
+  is_farm_admin(id)
+);
+-- Anyone signed in can create a farm (this is how onboarding works — the
+-- farm_users row that makes them its admin is inserted immediately after).
+create policy farm_insert_by_any_signed_in_user on farms for insert with check (
+  auth.uid() is not null
 );
 
--- farm_users: visible to members of the same farm
+-- farm_users: visible to any active member of the same farm
 alter table farm_users enable row level security;
 create policy farm_users_visible on farm_users for select using (
-  exists (select 1 from farm_users fu where fu.farm_id = farm_users.farm_id and fu.user_id = auth.uid())
+  is_farm_member(farm_id)
 );
-create policy farm_users_managed_by_admin on farm_users for insert with check (
-  exists (select 1 from farm_users fu where fu.farm_id = farm_users.farm_id and fu.user_id = auth.uid() and fu.role in ('admin','manager') and fu.status = 'active')
+create policy farm_users_insert on farm_users for insert with check (
+  -- Bootstrap case: the very first membership row for a brand-new farm —
+  -- must be the signed-in user adding themselves as admin.
+  (user_id = auth.uid() and role = 'admin' and farm_has_no_members(farm_id))
+  -- Normal case: an existing admin/manager adding someone else.
+  or is_farm_admin_or_manager(farm_id)
 );
 create policy farm_users_updated_by_admin on farm_users for update using (
-  exists (select 1 from farm_users fu where fu.farm_id = farm_users.farm_id and fu.user_id = auth.uid() and fu.role in ('admin','manager') and fu.status = 'active')
+  is_farm_admin_or_manager(farm_id)
 );
 
 -- users: a user can see their own row, plus co-members of any shared farm
 alter table users enable row level security;
 create policy users_self on users for select using (id = auth.uid());
+create policy users_self_insert on users for insert with check (id = auth.uid());
 create policy users_self_update on users for update using (id = auth.uid());
 
 -- indexes (per Section D.1 — high volume tables)

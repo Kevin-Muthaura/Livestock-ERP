@@ -30,24 +30,27 @@ export default function OnboardingPage() {
       const phone = localAuth?.phone ? normalizePhone(localAuth.phone) : null;
 
       // Ensure a row exists in our public users table (mirrors auth.users)
-      await supabase.from("users").upsert({ id: user.id, phone });
+      const { error: userErr } = await supabase.from("users").upsert({ id: user.id, phone });
+      if (userErr) throw userErr;
 
-      const { data: farm, error: farmErr } = await supabase
-        .from("farms")
-        .insert({ name, location, currency })
-        .select()
-        .single();
+      // Generate the farm's id ourselves rather than asking Postgres to
+      // hand it back via .select() — a brand-new farm has no farm_users row
+      // yet, so it isn't visible under the farms SELECT policy for that
+      // split second, and requesting it back (RETURNING) would fail RLS.
+      // The farm_users insert right after this is what makes it visible.
+      const newFarmId = crypto.randomUUID();
+      const { error: farmErr } = await supabase.from("farms").insert({ id: newFarmId, name, location, currency });
       if (farmErr) throw farmErr;
 
       const { error: memberErr } = await supabase.from("farm_users").insert({
-        farm_id: farm.id,
+        farm_id: newFarmId,
         user_id: user.id,
         role: "admin",
         status: "active",
       });
       if (memberErr) throw memberErr;
 
-      await cacheFarmContext(farm.id, "admin", farm.name);
+      await cacheFarmContext(newFarmId, "admin", name);
       router.push("/manager");
     } catch (err) {
       setError(err.message || "Could not create farm.");

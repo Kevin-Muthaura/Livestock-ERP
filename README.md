@@ -15,6 +15,8 @@ just the migration(s) you're missing, in order:
 2. `supabase/migrations/002_breeding_reminders.sql`
 3. `supabase/migrations/003_customer_ledger.sql`
 4. `supabase/migrations/004_notification_engine.sql`
+5. `supabase/migrations/005_fix_farm_creation_rls.sql` — fixes a farm-creation bug (RLS
+   recursion + missing insert policies) present in every earlier version
 
 ## What's implemented
 
