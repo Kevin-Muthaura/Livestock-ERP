@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
-import { getFarmContext } from "@/lib/auth";
+import { getFarmContext, normalizePhone } from "@/lib/auth";
 
 export default function TeamPage() {
   const [farm, setFarm] = useState(null);
@@ -32,8 +32,8 @@ export default function TeamPage() {
     e.preventDefault();
     setMessage("");
     try {
-      // Find or create a placeholder user row by phone (they complete signup via OTP on their own device)
-      let { data: existing } = await supabase.from("users").select("id").eq("phone", phone).maybeSingle();
+      // Find or create a placeholder user row by phone (they complete account creation on their own device first)
+      let { data: existing } = await supabase.from("users").select("id").eq("phone", normalizePhone(phone)).maybeSingle();
       let userId = existing?.id;
 
       if (!userId) {

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { cacheFarmContext } from "@/lib/auth";
+import { cacheFarmContext, normalizePhone } from "@/lib/auth";
+import { db } from "@/lib/db";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -22,8 +23,14 @@ export default function OnboardingPage() {
       const user = userData?.user;
       if (!user) throw new Error("Not signed in — go back and sign in again.");
 
+      // The account's phone number lives in our local session cache (set at
+      // login), since Supabase's auth.users.phone is only populated by the
+      // phone/OTP provider, which this system no longer uses.
+      const localAuth = await db.session.get("auth");
+      const phone = localAuth?.phone ? normalizePhone(localAuth.phone) : null;
+
       // Ensure a row exists in our public users table (mirrors auth.users)
-      await supabase.from("users").upsert({ id: user.id, phone: user.phone });
+      await supabase.from("users").upsert({ id: user.id, phone });
 
       const { data: farm, error: farmErr } = await supabase
         .from("farms")
