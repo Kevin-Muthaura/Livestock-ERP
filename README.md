@@ -54,10 +54,20 @@ and needs an account with a third party.
 
 It's been replaced with **phone number + PIN**, using Supabase's built-in email/password auth
 under the hood: the phone number becomes the account's unique identifier and the PIN is the
-password (a private, unused pseudo-email like `254712345678@livestock-erp.local` is what
-Supabase actually stores — nothing is ever sent to it). Zero external services, zero SMS cost,
-nothing to misconfigure. See `SETUP_GUIDE.docx` Step 3 for the one Supabase setting this needs
-(turning off "Confirm email," since workers don't have real inboxes to confirm).
+password (a private, unused pseudo-email like `254712345678@your-app.vercel.app` is what
+Supabase actually stores — nothing is ever sent to it, and no real inbox exists there). Zero
+external services, zero SMS cost, nothing to misconfigure. See `SETUP_GUIDE.docx` Step 3 for
+the one Supabase setting this needs (turning off "Confirm email," since workers don't have real
+inboxes to confirm).
+
+**Note on the pseudo-email domain:** it must be a real, live domain — Supabase's email
+validator checks the domain against real TLD rules, and made-up domains like `.local`, `.test`,
+or `.example` get rejected with "Email address ... is invalid," since none of those are real,
+delegated top-level domains. This system uses the app's own live hostname (`window.location.hostname`
+at login time) rather than a made-up one, so it's always a real, valid domain automatically —
+no configuration needed. Because Vercel's assigned `*.vercel.app` URL for a project is stable
+(it doesn't change on redeploy, only if you rename the project or add a custom domain later),
+this is a one-time, zero-maintenance detail in the common case.
 
 The offline PIN-unlock behavior for returning users is unchanged — this only affects how a
 brand-new device signs in for the first time.
