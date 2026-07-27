@@ -16,18 +16,6 @@ export default function ProfitabilityPage() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    getFarmContext().then((ctx) => {
-      if (!ctx) return;
-      setFarm(ctx);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (farm) loadData(farm.farm_id, periodDays);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [farm, periodDays]);
-
   async function loadData(farm_id, days) {
     setLoading(true);
     const since = new Date();
@@ -78,6 +66,18 @@ export default function ProfitabilityPage() {
     setRows(computed);
     setLoading(false);
   }
+
+  useEffect(() => {
+    getFarmContext().then((ctx) => {
+      if (!ctx) return;
+      setFarm(ctx);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (farm) loadData(farm.farm_id, periodDays);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [farm, periodDays]);
 
   const best = rows.slice(0, 3);
   const worst = [...rows].reverse().slice(0, 3).filter((r) => !best.includes(r));

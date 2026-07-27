@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { getFarmContext, signOutLocal } from "@/lib/auth";
+import NotificationBell from "@/components/NotificationBell";
 
 export default function ManagerDashboard() {
   const router = useRouter();
@@ -73,15 +74,18 @@ export default function ManagerDashboard() {
           <p className="text-sm text-neutral-500">Farm overview (last 30 days)</p>
           <h1 className="text-xl font-bold text-green-800">{farm?.farm_name || "Your Farm"}</h1>
         </div>
-        <button
-          onClick={async () => {
-            await signOutLocal();
-            router.push("/");
-          }}
-          className="text-sm text-neutral-400 underline"
-        >
-          Sign out
-        </button>
+        <div className="flex items-center gap-3">
+          <NotificationBell />
+          <button
+            onClick={async () => {
+              await signOutLocal();
+              router.push("/");
+            }}
+            className="text-sm text-neutral-400 underline"
+          >
+            Sign out
+          </button>
+        </div>
       </div>
 
       {!navigator?.onLine && (
@@ -160,6 +164,9 @@ export default function ManagerDashboard() {
         </Link>
         <Link href="/manager/customers" className="bg-indigo-700 text-white rounded-xl p-4 text-center font-semibold">
           🧾 Customers
+        </Link>
+        <Link href="/manager/notifications" className="bg-rose-700 text-white rounded-xl p-4 text-center font-semibold">
+          🔔 Notifications
         </Link>
         <Link href="/manager/team" className="bg-neutral-700 text-white rounded-xl p-4 text-center font-semibold">
           👥 Team

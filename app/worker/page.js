@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import BigButton from "@/components/BigButton";
 import PendingBadge from "@/components/PendingBadge";
+import NotificationBell from "@/components/NotificationBell";
 import { getFarmContext, signOutLocal } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 
@@ -24,15 +25,18 @@ export default function WorkerHome() {
           <p className="text-sm text-neutral-500">Today's tasks</p>
           <h1 className="text-xl font-bold text-green-800">{farmName || "Your Farm"}</h1>
         </div>
-        <button
-          onClick={async () => {
-            await signOutLocal();
-            router.push("/");
-          }}
-          className="text-sm text-neutral-400 underline"
-        >
-          Sign out
-        </button>
+        <div className="flex items-center gap-3">
+          <NotificationBell />
+          <button
+            onClick={async () => {
+              await signOutLocal();
+              router.push("/");
+            }}
+            className="text-sm text-neutral-400 underline"
+          >
+            Sign out
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 flex-1">
